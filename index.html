@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเบิกพัสดุ (Inventory System)</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800 flex items-center justify-center p-4">
+
+    <div id="customModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 transform scale-95 transition-transform duration-300">
+            <div class="text-center">
+                <div id="modalIcon" class="text-4xl mb-3"></div>
+                <h3 id="modalTitle" class="text-xl font-bold mb-2 text-gray-800">Title</h3>
+                <p id="modalMessage" class="text-gray-600 mb-6">Message goes here</p>
+                <button onclick="closeModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl transition duration-200">ตกลง</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loginScreen" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 fade-in">
+        <div class="text-center mb-8">
+            <div class="bg-blue-100 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner"><i class="fa-solid fa-box-open"></i></div>
+            <h1 class="text-2xl font-bold text-gray-800">ระบบเบิกพัสดุ</h1>
+            <p class="text-gray-500 mt-1">กรุณาเข้าสู่ระบบเพื่อดำเนินการ</p>
+        </div>
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-semibold mb-2">รหัสพนักงาน</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-user"></i></span>
+                    <input class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition" id="username" type="text" required>
+                </div>
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-semibold mb-2">รหัสผ่าน</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-lock"></i></span>
+                    <input class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition" id="password" type="password" required>
+                </div>
+            </div>
+            <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200">เข้าสู่ระบบ</button>
+        </form>
+    </div>
+
+    <div id="dashboardScreen" class="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden hidden fade-in">
+        <div class="bg-blue-600 p-6 text-white flex justify-between items-center">
+            <div>
+                <h2 class="text-sm font-medium opacity-80 mb-1">ระบบจัดการคลังพัสดุ</h2>
+                <div class="flex items-center">
+                    <p id="displayUserName" class="text-xl font-bold mr-3">ชื่อผู้ใช้งาน</p>
+                    <span id="roleBadge" class="text-xs bg-white text-blue-600 px-3 py-1 rounded-full font-bold uppercase">ROLE</span>
+                </div>
+            </div>
+            <button onclick="handleLogout()" class="bg-white/20 hover:bg-white/30 rounded-lg py-2 px-4 text-sm transition font-medium"><i class="fa-solid fa-right-from-bracket mr-1"></i> ออกจากระบบ</button>
+        </div>
+
+        <div class="bg-gray-50 flex border-b border-gray-200 overflow-x-auto">
+            <button onclick="switchView('requisition')" id="nav-requisition" class="tab-btn px-6 py-4 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 bg-white transition"><i class="fa-solid fa-cart-plus mr-2"></i>ขอทำรายการพัสดุ</button>
+            <button onclick="switchView('inventory')" id="nav-inventory" class="tab-btn px-6 py-4 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:bg-gray-100 transition"><i class="fa-solid fa-boxes-stacked mr-2"></i>คลังพัสดุ</button>
+            <button onclick="switchView('users')" id="nav-users" class="tab-btn px-6 py-4 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:bg-gray-100 transition hidden"><i class="fa-solid fa-users-gear mr-2"></i>จัดการผู้ใช้งาน</button>
+        </div>
+
+        <div class="p-6 min-h-[400px]">
+            
+            <div id="view-requisition" class="fade-in max-w-2xl mx-auto">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-cart-plus text-blue-500 mr-2"></i>ฟอร์มเบิกพัสดุใหม่</h3>
+                <form id="addItemForm" onsubmit="handleAddItem(event)" class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-gray-700 text-sm font-semibold mb-2">เลือกรายการพัสดุ</label>
+                            <div class="relative">
+                                <select id="itemName" class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 bg-white transition" required>
+                                    <option value="" disabled selected>-- กำลังโหลดข้อมูล... --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-semibold mb-2">จำนวน</label>
+                            <input class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition" id="quantity" type="number" min="1" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="mt-4 w-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold py-2 px-4 rounded-lg transition"><i class="fa-solid fa-plus mr-1"></i> เพิ่มลงรายการ</button>
+                </form>
+
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">รายการที่เลือก (<span id="cartCount">0</span>)</h4>
+                    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-600 border-b border-gray-200"><tr><th class="px-4 py-2">รายการ</th><th class="px-4 py-2 w-20 text-center">จำนวน</th><th class="px-4 py-2 w-16 text-center">ลบ</th></tr></thead>
+                            <tbody id="cartList"><tr><td colspan="3" class="px-4 py-6 text-center text-gray-400">ยังไม่มีรายการพัสดุ</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">หมายเหตุ / วัตถุประสงค์ (ถ้ามี)</label>
+                    <textarea class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition" id="note" rows="2"></textarea>
+                </div>
+
+                <button type="button" id="submitBtn" onclick="submitFinalRequisition()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl opacity-50 cursor-not-allowed transition" disabled>
+                    <span><i class="fa-solid fa-paper-plane mr-2"></i>ยืนยันการเบิกพัสดุทั้งหมด</span>
+                </button>
+            </div>
+
+            <div id="view-inventory" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-boxes-stacked text-blue-500 mr-2"></i>ข้อมูลคลังพัสดุทั้งหมด</h3>
+                    <button onclick="renderInventory()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-2 px-4 rounded-lg transition text-sm"><i class="fa-solid fa-arrows-rotate mr-1"></i> รีเฟรช</button>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-600 border-b border-gray-200"><tr><th class="px-4 py-3 w-24">รหัสพัสดุ</th><th class="px-4 py-3">ชื่อรายการพัสดุ</th><th class="px-4 py-3 text-center w-32">ยอดคงเหลือ</th><th class="px-4 py-3 text-center w-24">จัดการ</th></tr></thead>
+                        <tbody id="inventoryList"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-users" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users-gear text-blue-500 mr-2"></i>รายชื่อข้อมูลผู้ใช้งาน</h3>
+                    <button onclick="renderUsers()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-2 px-4 rounded-lg transition text-sm"><i class="fa-solid fa-arrows-rotate mr-1"></i> รีเฟรช</button>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-600 border-b border-gray-200"><tr><th class="px-4 py-3">Username</th><th class="px-4 py-3">ชื่อ - นามสกุล</th><th class="px-4 py-3 text-center w-32">สิทธิ์ (Role)</th><th class="px-4 py-3 text-center w-24">จัดการ</th></tr></thead>
+                        <tbody id="usersList"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ใส่ Web App URL ของคุณตรงนี้
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzkXqg-IEKO-gbHMBRJYKp27P2riWHdBgrzYlKv7YIfoAQe_AC6shdHhrN9zoTrmFXJ/exec"; 
+
+        let loggedInUser = null;
+        let cartItems = [];
+
+        // Mock Data สำรองไว้ทดสอบตอนยังไม่ใส่ URL
+        const mockInventoryData = [{ id: 'ITM-001', name: 'กระดาษ A4 (รีม)', qty: 45 }];
+        const mockUsersData = [{ username: 'admin', name: 'คุณสมชาย (ผู้จัดการ)', role: 'admin' }];
+
+        // UI Helpers
+        function showModal(title, message, type = 'info') {
+            const modal = document.getElementById('customModal');
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = message;
+            document.getElementById('modalIcon').innerHTML = type === 'success' ? '<i class="fa-regular fa-circle-check text-green-500"></i>' : (type === 'error' ? '<i class="fa-regular fa-circle-xmark text-red-500"></i>' : '<i class="fa-solid fa-circle-info text-blue-500"></i>');
+            document.getElementById('modalTitle').className = type === 'success' ? 'text-xl font-bold mb-2 text-green-600' : (type === 'error' ? 'text-xl font-bold mb-2 text-red-600' : 'text-xl font-bold mb-2 text-blue-600');
+            modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+        }
+        function closeModal() { document.getElementById('customModal').classList.add('opacity-0'); setTimeout(() => { document.getElementById('customModal').classList.add('hidden'); }, 300); }
+        function toggleScreen(s1, s2) { document.getElementById(s2).classList.add('hidden'); document.getElementById(s1).classList.remove('hidden'); }
+        function setLoading(id, load, text) { const b = document.getElementById(id); b.disabled = load; b.innerHTML = load ? `<span class="loader"></span> กำลังประมวลผล...` : text; if(load) b.classList.add('opacity-70','cursor-not-allowed'); else b.classList.remove('opacity-70','cursor-not-allowed'); }
+
+        function switchView(viewName) {
+            ['requisition','inventory','users'].forEach(v => {
+                document.getElementById('view-'+v).classList.add('hidden');
+                document.getElementById('nav-'+v).classList.remove('text-blue-600','border-blue-600','bg-white');
+                document.getElementById('nav-'+v).classList.add('text-gray-500','border-transparent');
+            });
+            document.getElementById('view-'+viewName).classList.remove('hidden');
+            document.getElementById('nav-'+viewName).classList.remove('text-gray-500','border-transparent');
+            document.getElementById('nav-'+viewName).classList.add('text-blue-600','border-blue-600','bg-white');
+
+            if(viewName === 'inventory') renderInventory();
+            if(viewName === 'users') renderUsers();
+        }
+
+        async function sendToGAS(payload) {
+            if (!GAS_WEB_APP_URL) {
+                return new Promise(resolve => setTimeout(() => {
+                    if(payload.action === 'login') resolve({status:'success', name:'ทดสอบแอดมิน', role:'admin'});
+                    else if(payload.action === 'getData' && payload.type === 'inventory') resolve({status:'success', data:mockInventoryData});
+                    else if(payload.action === 'getData' && payload.type === 'users') resolve({status:'success', data:mockUsersData});
+                    else resolve({status:'success', message:'สำเร็จ (โหมดจำลอง)'});
+                }, 800));
+            }
+            try {
+                const response = await fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) });
+                return await response.json();
+            } catch (e) { return { status: 'error', message: 'ไม่สามารถเชื่อมต่อได้' }; }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const originalBtnText = `<span>เข้าสู่ระบบ</span>`;
+            setLoading('loginBtn', true, originalBtnText);
+            const response = await sendToGAS({ action: 'login', username: document.getElementById('username').value, password: document.getElementById('password').value });
+            setLoading('loginBtn', false, originalBtnText);
+
+            if (response.status === 'success') {
+                loggedInUser = { username: document.getElementById('username').value, name: response.name, role: response.role };
+                document.getElementById('displayUserName').innerText = response.name;
+                document.getElementById('roleBadge').innerText = response.role;
+                document.getElementById('roleBadge').className = response.role === 'admin' ? 'text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold uppercase' : 'text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold uppercase';
+                if (response.role === 'admin') document.getElementById('nav-users').classList.remove('hidden');
+                
+                document.getElementById('password').value = '';
+                
+                // โหลดข้อมูล Dropdown ไว้ล่วงหน้า
+                await loadDropdown(); 
+
+                switchView('requisition');
+                toggleScreen('dashboardScreen', 'loginScreen');
+            } else showModal('ล้มเหลว', response.message, 'error');
+        }
+
+        // โหลดข้อมูลเข้า Dropdown
+        async function loadDropdown() {
+            const select = document.getElementById('itemName');
+            select.innerHTML = '<option value="" disabled selected>กำลังดึงข้อมูล...</option>';
+            const res = await sendToGAS({ action: 'getData', type: 'inventory' });
+            if(res.status === 'success') {
+                select.innerHTML = '<option value="" disabled selected>-- เลือกพัสดุ --</option>';
+                res.data.forEach(item => {
+                    const label = `${item.name} (คงเหลือ: ${item.qty})`;
+                    const disabled = item.qty <= 0 ? 'disabled' : '';
+                    select.innerHTML += `<option value="${item.name}" data-qty="${item.qty}" ${disabled}>${label}</option>`;
+                });
+            }
+        }
+
+        // โหลดตารางคลังพัสดุ
+        async function renderInventory() {
+            const tbody = document.getElementById('inventoryList');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-500"><span class="loader"></span> กำลังโหลด...</td></tr>';
+            const res = await sendToGAS({ action: 'getData', type: 'inventory' });
+            if(res.status === 'success') {
+                tbody.innerHTML = res.data.map(item => `
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                        <td class="px-4 py-3 font-mono text-xs text-gray-500">${item.id}</td>
+                        <td class="px-4 py-3 font-medium">${item.name}</td>
+                        <td class="px-4 py-3 text-center font-bold ${item.qty < 20 ? 'text-red-500' : 'text-blue-600'}">${item.qty}</td>
+                        <td class="px-4 py-3 text-center"><span class="text-xs text-gray-400">อัปเดตที่ Sheet</span></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // โหลดตารางผู้ใช้
+        async function renderUsers() {
+            const tbody = document.getElementById('usersList');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-500"><span class="loader"></span> กำลังโหลด...</td></tr>';
+            const res = await sendToGAS({ action: 'getData', type: 'users' });
+            if(res.status === 'success') {
+                tbody.innerHTML = res.data.map(u => `
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                        <td class="px-4 py-3 font-medium">${u.username}</td>
+                        <td class="px-4 py-3">${u.name}</td>
+                        <td class="px-4 py-3 text-center"><span class="text-xs px-2.5 py-1 rounded-full ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'} font-semibold uppercase">${u.role}</span></td>
+                        <td class="px-4 py-3 text-center"><span class="text-xs text-gray-400">อัปเดตที่ Sheet</span></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function handleAddItem(e) {
+            e.preventDefault();
+            const itemSelect = document.getElementById('itemName');
+            const qtyInput = document.getElementById('quantity');
+            if (!itemSelect.value || qtyInput.value < 1) return;
+            
+            // เช็คว่าเกินสต๊อกไหม
+            const maxQty = parseInt(itemSelect.options[itemSelect.selectedIndex].getAttribute('data-qty'));
+            if(parseInt(qtyInput.value) > maxQty) {
+                showModal('แจ้งเตือน', `เบิกได้สูงสุด ${maxQty} ชิ้นเท่านั้น`, 'error');
+                return;
+            }
+
+            const existing = cartItems.findIndex(i => i.item === itemSelect.value);
+            if (existing !== -1) cartItems[existing].quantity += parseInt(qtyInput.value);
+            else cartItems.push({ item: itemSelect.value, quantity: parseInt(qtyInput.value) });
+
+            itemSelect.value = ''; qtyInput.value = ''; renderCart();
+        }
+
+        function renderCart() {
+            const cartList = document.getElementById('cartList');
+            document.getElementById('cartCount').innerText = cartItems.length;
+            const btn = document.getElementById('submitBtn');
+            
+            if (cartItems.length === 0) {
+                cartList.innerHTML = `<tr><td colspan="3" class="px-4 py-6 text-center text-gray-400">ยังไม่มีรายการพัสดุ</td></tr>`;
+                btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); return;
+            }
+
+            btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            cartList.innerHTML = cartItems.map((c, i) => `
+                <tr class="border-b border-gray-100">
+                    <td class="px-4 py-3 text-gray-700">${c.item}</td>
+                    <td class="px-4 py-3 text-center font-semibold text-blue-600">${c.quantity}</td>
+                    <td class="px-4 py-3 text-center"><button onclick="cartItems.splice(${i}, 1); renderCart()" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-trash-can"></i></button></td>
+                </tr>
+            `).join('');
+        }
+
+        async function submitFinalRequisition() {
+            if (cartItems.length === 0) return;
+            const btnText = `<span><i class="fa-solid fa-paper-plane mr-2"></i>ยืนยันการเบิกพัสดุทั้งหมด</span>`;
+            setLoading('submitBtn', true, btnText);
+
+            const res = await sendToGAS({ action: 'requisition', username: loggedInUser.username, name: loggedInUser.name, items: cartItems, note: document.getElementById('note').value });
+            setLoading('submitBtn', false, btnText);
+
+            if (res.status === 'success') {
+                showModal('สำเร็จ!', res.message, 'success');
+                cartItems = []; document.getElementById('note').value = ''; renderCart();
+                loadDropdown(); // โหลดสต๊อกใหม่
+            } else showModal('เกิดข้อผิดพลาด', res.message, 'error');
+        }
+
+        function handleLogout() {
+            loggedInUser = null; cartItems = []; document.getElementById('loginForm').reset();
+            document.getElementById('nav-users').classList.add('hidden');
+            renderCart(); toggleScreen('loginScreen', 'dashboardScreen');
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+        }
+    </script>
+</body>
+</html>
