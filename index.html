@@ -832,23 +832,58 @@
             }, ms);
         }
 
-        // ==========================================
-        //  [PREPARATION] GAS API WRAPPERS (Mockup)
-        // ==========================================
-        function isGasMode() {
-            return sysSettings && sysSettings.gasApiUrl && sysSettings.gasApiUrl.trim() !== '';
-        }
+// ==========================================
+//  GAS API WRAPPERS (อัปเดตสำหรับเชื่อมต่อจริง)
+// ==========================================
+function isGasMode() {
+    return sysSettings && sysSettings.gasApiUrl && sysSettings.gasApiUrl.trim() !== '';
+}
 
-        async function gasApiCall(action, payload = null) {
-            if (!isGasMode()) return { status: 'mock' };
-            try { return { status: 'mock_pending_connection' }; } 
-            catch (err) { console.error("GAS API Call failed:", err); throw err; }
-        }
+async function gasApiCall(action, payload = {}) {
+    if (!isGasMode()) return { status: 'mock' };
+    
+    try {
+        // ใช้ fetch แบบ POST และส่ง Content-Type เป็น text/plain เพื่อป้องกันปัญหา CORS Preflight ใน GAS
+        const response = await fetch(sysSettings.gasApiUrl.trim(), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            },
+            body: JSON.stringify({ action: action, ...payload })
+        });
+        
+        const result = await response.json();
+        return result;
+    } catch (err) {
+        console.error("GAS API Call failed:", err);
+        throw err;
+    }
+}
 
-        async function uploadImageToDrive(base64Data, filename) {
-            return base64Data; 
+async function uploadImageToDrive(base64Data, filename) {
+    // ถ้าไม่ได้ตั้งค่า Web App URL ไว้ ให้ทำงานแบบ Offline (คืนค่า Base64 กลับไปเลย)
+    if (!isGasMode()) return base64Data; 
+    
+    try {
+        const result = await gasApiCall('uploadImage', {
+            base64: base64Data,
+            fileName: filename,
+            mimeType: 'image/png'
+        });
+        
+        if (result.success) {
+            return result.url; // คืนค่า URL ของรูปที่อยู่บน Google Drive
+        } else {
+            console.error('อัปโหลดรูปล้มเหลว:', result.error);
+            showToast('อัปโหลดรูปภาพไม่สำเร็จ ระบบจะใช้รูปชั่วคราว', 'error');
+            return base64Data; // Fallback
         }
-        // ==========================================
+    } catch (err) {
+        showToast('เชื่อมต่อ API ไม่สำเร็จ ระบบจะใช้รูปชั่วคราว', 'error');
+        return base64Data; // Fallback
+    }
+}
+// ==========================================
 
         // --- UI HELPERS ---
         function formatThaiDate(dateStr) {
